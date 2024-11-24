@@ -1,5 +1,5 @@
 # nbgui
-embed a live gui in jupyter
+embed a live gui in jupyter notebooks
 
 uses jupyter_rfb, pyglet, and imgui
 
