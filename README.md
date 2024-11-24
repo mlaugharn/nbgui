@@ -5,11 +5,12 @@ uses jupyter_rfb, pyglet, and imgui
 
 - rendering:
   - gui is rendered in a hidden window
-  - window pixels are placed into a numpy array
-  - uses jupyter-rfb for streaming the remote framebuffer to the jupyter notebook in realtime
+  - window pixels are placed into a numpy array as a remote framebuffer
+  - jupyter-rfb streams the remote framebuffer to the browser's jupyter notebook session in realtime
 - ui events:
-  - jupyter-rfb streams ui io events back to python
-  - we translate the jupyter-rfb events + coordinates into the format `dear imgui` expects then notify it so it can handle them
+  - user does some io with the jupyter-rfb widget
+  - jupyter-rfb signals the widget io events back to the python script
+  - we translate the jupyter-rfb events + coordinates back into a compatible format and then pass them forward to `dear imgui`
 - can use the entire `dear imgui` ecosystem for ui components + building the gui logic
 - the widget is resizable by dragging the lower right corner
 
