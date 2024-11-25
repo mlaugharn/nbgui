@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nbgui"
+version = "0.1.0"
+description = "bidirectional streamable guis in jupyter notebooks"
+authors = [
+    { name = "Marc Laugharn", email = "mlaugharn@gmail.com"}
+]
+license = { text = "MIT"}
+readme = "README.md"
+#requires-python = ">=3"
+
+[project.urls]
+homepage = "https"
+repository = "https://github.com/mlaugharn/nbgui"
+
+[tool.setuptools]
+#...
+
+[tool.setuptools.packages.find]
+where = ["nbgui"]
