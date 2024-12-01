@@ -8,14 +8,15 @@ from jupyter_rfb import RemoteFrameBuffer
 import time
 import math
 import ctypes
+from contextlib import contextmanager
 
 
 class nbgui(RemoteFrameBuffer):
     def __init__(self, **kwargs):
         kwargs['quality'] = 100
         # Base window size (logical pixels)
-        self.base_width = 1280
-        self.base_height = 1024
+        self.base_width = 500
+        self.base_height = 300
         kwargs['css_width'] = f'{self.base_width}px'
         kwargs['css_height'] = f'{self.base_height}px'
         super().__init__(**kwargs)
@@ -355,3 +356,99 @@ class nbgui(RemoteFrameBuffer):
         # Close window
         self.window.close()
         super().close()
+
+class nb_dearpygui(nbgui):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+        # Initialize ImGui with Pyglet
+        
+        self.ctx = imgui.create_context()
+        self.io = imgui.get_io()
+        # self.io.display_size = float(self.width), float(self.height)
+        
+        # Initialize Pyglet renderer with the window from nbgui
+        from imgui.integrations.pyglet import PygletRenderer
+        self._impl = PygletRenderer(self.window)
+        
+        # Staging system (DPG-style)
+        self._staged_items = {}  # id -> (type, args, kwargs, parent_id)
+        self._container_stack = []
+        self._next_id = 1
+
+    def add_window(self, label="", **kwargs):
+        """Create a window - returns context manager"""
+        window_id = self._next_id
+        self._next_id += 1
+        self._staged_items[window_id] = ("window", [label], kwargs, None)
+        return _ContainerContext(self, window_id)
+
+    def add_text(self, text, parent=None, **kwargs):
+        """Add text to current container"""
+        item_id = self._next_id
+        self._next_id += 1
+        parent = parent or (self._container_stack[-1] if self._container_stack else None)
+        self._staged_items[item_id] = ("text", [text], kwargs, parent)
+        return item_id
+
+    def add_button(self, parent=None, **kwargs):
+        """Add button to current container"""
+        item_id = self._next_id
+        self._next_id += 1
+        parent = parent or (self._container_stack[-1] if self._container_stack else None)
+        self._staged_items[item_id] = ("button", [], kwargs, parent)
+        return item_id
+
+    def get_frame(self):
+        """Main render loop"""
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+        
+        # Start new frame
+        imgui.new_frame()
+        
+        try:
+            # Render all staged items
+            self._draw_gui()
+            
+            # End frame and render
+            imgui.end_frame()
+            imgui.render()
+            self._impl.render(imgui.get_draw_data())
+        except Exception as e:
+            # Ensure we always end the frame
+            imgui.end_frame()
+            imgui.render()
+            raise e
+        
+        return super().get_frame()
+
+    def _draw_gui(self):
+        """Render the staged GUI"""
+        # First pass: render windows
+        for id_, (type_, args, kwargs, parent) in self._staged_items.items():
+            if type_ == "window":
+                expanded = imgui.begin(args[0] if args else "")[0]
+                if expanded:
+                    # Second pass: render child items
+                    for child_id, (child_type, child_args, child_kwargs, child_parent) in self._staged_items.items():
+                        if child_parent == id_:
+                            if child_type == "text":
+                                imgui.text(child_args[0])
+                            elif child_type == "button":
+                                if imgui.button(child_kwargs.get("label", "")):
+                                    if child_kwargs.get("callback"):
+                                        child_kwargs["callback"]()
+                imgui.end()
+
+
+class _ContainerContext:
+    def __init__(self, gui, container_id):
+        self.gui = gui
+        self.container_id = container_id
+    
+    def __enter__(self):
+        self.gui._container_stack.append(self.container_id)
+        return self.container_id
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.gui._container_stack.pop()
